@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Spoon Stars — PoW Slot</title>
+<style>
+  :root{
+    --bg:#0b1220; --card:#131c31; --ink:#e9f0ff; --muted:#9fb3d9;
+    --accent:#2ea8ff; --accent-2:#13d0a1; --gold:#f5c542; --bar:#242f4a;
+    --ok:#20c997; --warn:#ffb703; --err:#ff4d4f;
+    --radius:22px; --shadow: 0 12px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:radial-gradient(1200px 700px at 70% -10%, #1a2542 0%, #0b1220 60%);
+    font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    color:var(--ink);
+  }
+  .app{
+    max-width:980px; margin:40px auto; padding:24px;
+  }
+  .card{
+    background:linear-gradient(180deg,#151f38 0%,#0f1730 100%);
+    border:1px solid #223158; border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:28px;
+  }
+  h1{margin:0 0 6px;font-weight:800;letter-spacing:.4px}
+  .sub{color:var(--muted);margin:0 0 22px}
+  .row{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+  .col{flex:1}
+  label{display:block; font-size:.9rem; color:var(--muted); margin:6px 0}
+  input[type="text"]{
+    width:100%; padding:14px 16px; border-radius:14px; border:1px solid #27406d;
+    background:#0c1530; color:var(--ink); outline:none; font-size:15px;
+  }
+  input[type="text"]:focus{border-color:#3971ff; box-shadow:0 0 0 3px rgba(57,113,255,.15)}
+  .stars{
+    display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+  }
+  .star{
+    width:34px; height:34px; display:grid; place-items:center; cursor:pointer;
+    border-radius:50%; background:#0e1836; border:1px solid #223158;
+    transition:.15s transform;
+    font-size:20px;
+  }
+  .star.active{background:linear-gradient(180deg,#fbe07a,#f4c431); color:#1b1301; border-color:#e0b02a}
+  .star:hover{transform:translateY(-2px)}
+  .slider{
+    appearance:none; width:100%; height:10px; border-radius:999px; background:var(--bar); outline:none;
+  }
+  .slider::-webkit-slider-thumb{
+    -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%;
+    background:var(--gold); border:2px solid #2b2104; cursor:pointer;
+  }
+  .stats{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:14px;
+  }
+  .stat{background:#0b1431; border:1px solid #1f2a4d; border-radius:14px; padding:12px}
+  .stat .k{font-size:.78rem; color:var(--muted)}
+  .stat .v{font-weight:800; font-size:1.05rem}
+  .progress{
+    position:relative; height:18px; background:#0e1733; border:1px solid #203059; border-radius:999px; overflow:hidden;
+  }
+  .progress > span{
+    position:absolute; top:0; left:0; bottom:0; width:0%;
+    background:linear-gradient(90deg, #f7d24a, #f1b82c);
+    transition:width .15s ease-out;
+  }
+  .run-wrap{display:grid; place-items:center; margin:28px 0 12px}
+  .run{
+    width:210px; height:210px; border-radius:50%; border:none; color:white; font-weight:900; font-size:28px;
+    background:radial-gradient(120px 120px at 35% 35%, #45c1ff 0%, #0e79ff 65%, #0a54c7 100%);
+    box-shadow:0 20px 40px rgba(14,121,255,.35), inset 0 -6px 0 rgba(0,0,0,.25);
+    cursor:pointer; transition:transform .08s ease-in;
+  }
+  .run:active{transform:scale(.98)}
+  .run[disabled]{filter:grayscale(.4); cursor:not-allowed; opacity:.9}
+  .pill{
+    padding:.28rem .56rem; border-radius:999px; font-size:.78rem; font-weight:700; display:inline-block;
+    background:#0d1a3a; border:1px solid #213460; color:#b9c9ee;
+  }
+  .log{
+    background:#0b1431; border:1px dashed #273a6d; border-radius:14px; padding:12px; min-height:60px; white-space:pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; font-size:12.5px;
+  }
+  .footer{margin-top:10px; color:#89a5dc; font-size:.82rem}
+  .row-slim{display:flex; gap:10px; align-items:center; margin-top:8px}
+  .mini{font-size:.86rem; color:var(--muted)}
+  .ok{color:var(--ok)} .warn{color:var(--warn)} .err{color:var(--err)}
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="card">
+      <h1>⭐ Spoon Stars</h1>
+      <p class="sub">Pick your <b>stars</b> (leading hex zeros), set your <b>BTC address</b>, then pull the lever.<br/>For <b>5★</b> we run a local PoW <i>simulation</i>. Other tiers POST a job to your Spoon endpoint.</p>
+
+      <div class="row">
+        <div class="col">
+          <label>Stars</label>
+          <div id="starRow" class="stars"></div>
+          <input id="starSlider" class="slider" type="range" min="1" max="20" value="5" />
+          <div class="row-slim"><span class="pill" id="starsPill">5 ★</span><span class="mini">Each extra star multiplies work ×16</span></div>
+        </div>
+        <div class="col">
+          <label>Bitcoin address</label>
+          <input id="addr" type="text" placeholder="bc1q… or 1… / 3…" />
+          <div class="row-slim">
+            <span class="mini">We only simulate locally for 5★. Other tiers submit to Spoon.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><div class="k">Expected attempts (≈ 16^S)</div><div class="v" id="attemptsOut">1,048,576</div></div>
+        <div class="stat"><div class="k">Per-hash success p (S-stars)</div><div class="v" id="pstarOut">1 / 1,048,576</div></div>
+        <div class="stat"><div class="k">Chance to hit a real block during run (Z=20)</div><div class="v" id="pblockOut">~0.00000%</div></div>
+      </div>
+
+      <div style="margin-top:14px">
+        <label>Run progress</label>
+        <div class="progress"><span id="bar"></span></div>
+      </div>
+
+      <div class="run-wrap">
+        <button id="runBtn" class="run">RUN</button>
+      </div>
+
+      <div class="row-slim">
+        <span class="pill" id="modePill">Local PoW (5★)</span>
+        <span class="mini" id="statusMini">Ready.</span>
+      </div>
+
+      <div style="margin-top:12px">
+        <label>Session log</label>
+        <div class="log" id="log"></div>
+      </div>
+
+      <div class="footer">
+        Tip: S-stars probability = <code>16^-S</code>. Real block baseline Z ≈ 20 (hex zeros).
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ===================== Config ======================
+  const POOL_URL = "https://spoon.example/api/submit"; // <-- replace with real endpoint
+  const BLOCK_Z = 20; // network baseline: ~20 leading hex zeros
+  const MAX_UI_STARS = 20;
+
+  // ===================== Elements ====================
+  const starRow = document.getElementById('starRow');
+  const starSlider = document.getElementById('starSlider');
+  const starsPill = document.getElementById('starsPill');
+  const attemptsOut = document.getElementById('attemptsOut');
+  const pstarOut = document.getElementById('pstarOut');
+  const pblockOut = document.getElementById('pblockOut');
+  const addr = document.getElementById('addr');
+  const bar = document.getElementById('bar');
+  const runBtn = document.getElementById('runBtn');
+  const log = document.getElementById('log');
+  const modePill = document.getElementById('modePill');
+  const statusMini = document.getElementById('statusMini');
+
+  // ===================== Helpers =====================
+  const fmt = (n)=> {
+    if (!isFinite(n)) return String(n);
+    if (n >= 1e12) return (n/1e12).toFixed(3) + " T";
+    if (n >= 1e9)  return (n/1e9).toFixed(3) + " B";
+    if (n >= 1e6)  return (n/1e6).toFixed(3) + " M";
+    if (n >= 1e3)  return (n/1e3).toFixed(3) + " K";
+    return Math.round(n).toLocaleString();
+  };
+  const fmtPct = (x)=> (x*100).toFixed(5) + "%";
+  const hexRand = (bytes=31)=> {
+    const buf = new Uint8Array(bytes);
+    crypto.getRandomValues(buf);
+    return Array.from(buf, b => b.toString(16).padStart(2,'0')).join('');
+  };
+  const makeSuccessHash = (S) => "0".repeat(S) + hexRand(32 - Math.ceil(S/2)).slice(0, 64-S); // fake but matches zeros
+
+  const isValidBTC = (s)=>{
+    if (!s) return false;
+    const bech32 = /^bc1[ac-hj-np-z0-9]{11,71}$/; // loose check
+    const legacy = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+    return bech32.test(s) || legacy.test(s);
+  };
+
+  // ===================== Stars UI ====================
+  let S = parseInt(localStorage.getItem("spoon_S") || "5", 10);
+  if (S < 1 || S > MAX_UI_STARS) S = 5;
+  starSlider.value = String(S);
+  for (let i=1;i<=10;i++){
+    const el = document.createElement('button');
+    el.type = "button";
+    el.className = "star";
+    el.title = `${i} star${i>1?'s':''}`;
+    el.textContent = "⭐";
+    el.dataset.val = i;
+    el.addEventListener('click', ()=> { setStars(i); });
+    starRow.appendChild(el);
+  }
+  function paintStars(){
+    [...starRow.children].forEach(ch=>{
+      ch.classList.toggle("active", Number(ch.dataset.val) <= Math.min(S,10));
+    });
+  }
+
+  // ===================== Math ========================
+  function pStars(S){ return Math.pow(16, -S); } // per-hash success
+  function attempts(S){ return Math.pow(16, S); }
+  function pBlockDuringRun(S, Z=BLOCK_Z){
+    // 1 - exp(-16^(S-Z))
+    const pow = Math.pow(16, S - Z);
+    return 1 - Math.exp(-pow);
+  }
+
+  // ===================== State/UI ====================
+  function updateUI(){
+    localStorage.setItem("spoon_S", S);
+    starsPill.textContent = `${S} ★`;
+    starSlider.value = String(S);
+    paintStars();
+
+    const A = attempts(S);
+    attemptsOut.textContent = (S <= 12 ? A.toLocaleString() : fmt(A));
+    const pS = pStars(S);
+    pstarOut.textContent = `1 / ${(1/pS).toLocaleString(undefined,{maximumFractionDigits:0})}`;
+    const pB = pBlockDuringRun(S);
+    pblockOut.textContent = "~" + fmtPct(pB);
+
+    const mode = (S === 5) ? "Local PoW (5★)" : "Spoon POST";
+    modePill.textContent = mode;
+  }
+  function setStars(v){ S = Number(v); updateUI(); }
+
+  starSlider.addEventListener('input', (e)=> setStars(e.target.value));
+  updateUI();
+
+  // ===================== Run / Simulation ====================
+  let running = false;
+  let abortController = null;
+
+  function logLine(s){
+    log.textContent += s + "\n";
+    log.scrollTop = log.scrollHeight;
+  }
+  function resetProgress(){ bar.style.width = "0%"; }
+  function setProgress(frac){ bar.style.width = Math.min(100, Math.max(0, frac*100)) + "%"; }
+
+  async function runLocalPow(S, address){
+    // Simulate Bernoulli trials with p = 16^-S, in chunks to keep UI responsive.
+    const p = pStars(S);
+    const expected = attempts(S);
+    const chunk = Math.min(20000, Math.max(2000, Math.floor(expected/500))); // adaptive chunk
+    let tries = 0;
+    let success = false;
+    const t0 = performance.now();
+    logLine(`▶ Local PoW simulation started: S=${S} (p=1/${(1/p).toLocaleString()}).`);
+
+    while (running && !success){
+      // Chunked simulation
+      const n = Math.min(chunk, expected - tries);
+      for (let i=0; i<n; i++){
+        // Bernoulli test
+        if (Math.random() < p){ success = true; break; }
+      }
+      tries += n;
+      setProgress(Math.min(1, tries / expected));
+      statusMini.textContent = `Attempts: ${tries.toLocaleString()} / ~${expected.toLocaleString()}`;
+      await new Promise(r=> setTimeout(r, 0)); // yield
+      if (tries >= expected*8) { // safety cap
+        logLine("ℹ️ Safety cap reached (8× expected). Stopping.");
+        break;
+      }
+    }
+    const dt = (performance.now()-t0)/1000;
+
+    if (success){
+      const fakeHash = makeSuccessHash(S);
+      logLine(`✅ Success in ${tries.toLocaleString()} attempts (${dt.toFixed(2)}s).`);
+      logLine(`   Hash: ${fakeHash}`);
+      statusMini.textContent = `Success • ${tries.toLocaleString()} attempts (${dt.toFixed(2)}s)`;
+      setProgress(1);
+    } else {
+      logLine(`⏹ Stopped after ${tries.toLocaleString()} attempts (${dt.toFixed(2)}s). No success.`);
+      statusMini.textContent = `Stopped • ${tries.toLocaleString()} attempts`;
+    }
+  }
+
+  async function postToSpoon(S, address){
+    const payload = {
+      mode: "remote",
+      stars: S,
+      address,
+      clientNonce: hexRand(8),
+      ts: new Date().toISOString()
+    };
+    abortController = new AbortController();
+
+    logLine(`▶ POST ${POOL_URL}`);
+    logLine(`   Body: ${JSON.stringify(payload)}`);
+    setProgress(0.12);
+    statusMini.textContent = "Submitting to Spoon…";
+
+    try{
+      const res = await fetch(POOL_URL, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify(payload),
+        signal: abortController.signal
+      });
+      setProgress(0.35);
+      const text = await res.text();
+      setProgress(0.62);
+      logLine(`📥 Response (${res.status}): ${text.slice(0,400)}${text.length>400?'…':''}`);
+      statusMini.textContent = res.ok ? "Job accepted by Spoon" : "Spoon returned an error";
+      setProgress(res.ok ? 1 : 0.62);
+    }catch(err){
+      logLine(`❌ Network error: ${err.message || err}`);
+      statusMini.textContent = "Network error";
+      setProgress(0);
+    }
+  }
+
+  function ensureAddr(){
+    const s = addr.value.trim();
+    if (!isValidBTC(s)){
+      statusMini.innerHTML = "Please enter a valid <b>Bitcoin address</b>.";
+      addr.focus();
+      return null;
+    }
+    return s;
+  }
+
+  runBtn.addEventListener('click', async ()=>{
+    if (running){
+      // Abort
+      running = false;
+      if (abortController) abortController.abort();
+      runBtn.disabled = false;
+      runBtn.textContent = "RUN";
+      statusMini.textContent = "Stopped.";
+      return;
+    }
+
+    const address = ensureAddr();
+    if (!address) return;
+
+    running = true;
+    resetProgress();
+    logLine("────────────────────────────────────────────────────────");
+    runBtn.textContent = "STOP";
+    runBtn.disabled = false;
+    statusMini.textContent = "Running…";
+
+    if (S === 5){
+      await runLocalPow(S, address);
+    } else {
+      await postToSpoon(S, address);
+    }
+
+    running = false;
+    runBtn.textContent = "RUN";
+  });
+
+  // Prefill last address if any
+  addr.addEventListener('change', ()=> localStorage.setItem("spoon_addr", addr.value.trim()));
+  const last = localStorage.getItem("spoon_addr");
+  if (last) addr.value = last;
+
+})();
+</script>
+</body>
+</html>
